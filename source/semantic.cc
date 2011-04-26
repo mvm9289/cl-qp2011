@@ -105,6 +105,11 @@ void errorfielddefined(int l, string s) {
   cout<<"L. "<<l<<": Field "<<s<<" already defined in the struct."<<endl;
 }
 
+void errornoshadow(int l, string s) {
+  TypeError = 1;
+  cout<<"L. "<<l<<": Procedure or function "<<s<<" does not hide any existing one."<<endl;
+}
+
 /// ------------------------------------------------------------
 /// Table to store information about program identifiers
 symtab symboltable;
@@ -198,23 +203,70 @@ void construct_array(AST *a)
     a->tp->numelemsarray = stringtoint(child(a, 0)->text);
 }
 
+string decoration(ptype t)
+{
+    if (t->kind == "int") return "i";
+    if (t->kind == "bool") return "b";
+    if (t->kind == "array")
+    {
+        string aux = "a";
+        aux.append(itostring(t->numelemsarray));
+        aux.append(decoration(t->down));
+        return aux;
+    }
+    if (t->kind == "struct")
+    {
+        string aux = "s";
+        for (list<string>::iterator it = t->ids.begin(); it != t->ids.end(); it++)
+        {
+            aux.append("<");
+            aux.append(*it);
+            aux.append(",");
+            aux.append(decoration(t->struct_field[*it]));
+            aux.append(">");
+        }
+        aux.append("e");
+        return aux;
+    }
+
+    return "";
+}
+
 void create_header(AST *a)
 {
     a->tp = create_type(a->kind, 0, 0);
+
+    bool overload = false;
     
     if (a->kind == "function")
     {
         TypeCheck(child(child(a, 0), 1));
         a->tp->right = child(child(a, 0), 1)->tp;
+
+        if (child(child(a, 0), 2) != 0)
+        {
+            if (child(child(a, 0), 2)->kind == "shadow" && !symboltable.find(child(a, 0)->text))
+                errornoshadow(a->line, child(a, 0)->text);
+            else if (child(child(a, 0), 2)->kind == "overload") overload = true;
+        }
+    }
+    else if (child(child(a, 0), 1) != 0)
+    {
+        if (child(child(a, 0), 1)->kind == "shadow" && !symboltable.find(child(a, 0)->text))
+            errornoshadow(a->line, child(a, 0)->text);
+        else if (child(child(a, 0), 1)->kind == "overload") overload = true;
     }
     
     AST *a1 = child(child(child(a, 0), 0), 0);
     ptype prev = 0;
     int params = 0;
+    string aux = "";
     while (a1 != 0)
     {
         TypeCheck(child(a1, 1));
-        
+
+        if (overload) aux.append(decoration(child(a1, 1)->tp));
+
         ptype next = create_type("par" + a1->kind, child(a1, 1)->tp, 0);
         if (prev == 0) a->tp->down = next;
         else prev->right = next;
@@ -225,6 +277,12 @@ void create_header(AST *a)
     }
     
     a->tp->numelemsarray = params;
+
+    if (overload)
+    {
+        child(a, 0)->text.append("_");
+        child(a, 0)->text.append(aux);
+    }
 }
 
 void insert_header(AST *a)
@@ -441,6 +499,24 @@ void TypeCheck(AST *a,string info)
     /* KIND OPENPAR */
     else if (a->kind == "(")
     {
+        if (!symboltable.find(child(a, 0)->text))
+        {
+            string aux = "";
+            AST *aaux = child(child(a, 1), 0);
+            while (aaux != 0)
+            {
+                TypeCheck(aaux);
+                aux.append(decoration(aaux->tp));
+                aaux = aaux->right;
+            }
+            
+            string aux2 = child(a, 0)->text;
+            aux2.append("_");
+            aux2.append(aux);
+
+            if (symboltable.find(aux2)) child(a, 0)->text = aux2;
+        }
+        
         TypeCheck(child(a, 0));
         
         if (child(a, 0)->tp->kind != "error")

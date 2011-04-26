@@ -251,6 +251,9 @@ int main(int argc,char *argv[])
 #token OPENCLASP "\["
 #token CLOSECLASP "\]"
 
+#token SHADOW "SHADOW"
+#token OVERLOAD "OVERLOAD"
+
 #token ASIG ":="
 #token DOT "."
 #token REF "REF"
@@ -288,9 +291,9 @@ dec_bloc:
 	PROCEDURE^ signature_proc dec_vars l_dec_blocs l_instrs ENDPROCEDURE! |
 	(FUNCTION^ signature_func dec_vars l_dec_blocs l_instrs RETURN! expression ENDFUNCTION!)<</*needs modification*/ >>;
 
-signature_proc: IDENT^ OPENPAR! dec_parameters CLOSEPAR!;
+signature_proc: IDENT^ OPENPAR! dec_parameters CLOSEPAR! (SHADOW | OVERLOAD | );
 
-signature_func: IDENT^ OPENPAR! dec_parameters CLOSEPAR! RETURN! constr_type;
+signature_func: IDENT^ OPENPAR! dec_parameters CLOSEPAR! RETURN! constr_type (SHADOW | OVERLOAD | );
 
 dec_parameters: (dec_parameter (COMMA! dec_parameter)* | ) <<#0=createASTlist(_sibling);>>;
 
