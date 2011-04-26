@@ -17,6 +17,8 @@ using namespace std;
 
 #include "semantic.hh"
 
+#include "util.hh"
+
 // feedback the main program with our error status
 int TypeError = 0;
 
@@ -193,7 +195,7 @@ void construct_array(AST *a)
     TypeCheck(child(a, 1));
     
     a->tp = create_type("array", child(a, 1)->tp, 0);
-    a->tp->numelemsarray = atoi(child(a, 0)->text.c_str());
+    a->tp->numelemsarray = stringtoint(child(a, 0)->text);
 }
 
 void create_header(AST *a)
