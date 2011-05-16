@@ -142,7 +142,7 @@ void check_params(AST *a, ptype tp, int line, int numparam)
         params = 1;
         while (a != 0)
         {
-            TypeCheck(a);
+            TypeCheck(a, "expression");
             
             if (tp->kind == "parref" && (!a->ref || a->tp->kind == "procedure" || a->tp->kind == "function"))
                 errorreferenceableparam(line, params);
@@ -302,7 +302,7 @@ void TypeCheck(AST *a,string info)
     /* KIND WRITE or WRITELN */
     else if (a->kind == "write" || a->kind == "writeln")
     {
-        TypeCheck(child(a, 0));
+        TypeCheck(child(a, 0), "expression");
         
         if (child(a, 0)->tp->kind != "error" && !isbasickind(child(a, 0)->tp->kind) && child(a, 0)->tp->kind != "string")
             errorreadwriterequirebasic(a->line, a->kind);
@@ -311,7 +311,7 @@ void TypeCheck(AST *a,string info)
     /* KIND IF */
     else if (a->kind == "if")
     {
-        TypeCheck(child(a, 0));
+        TypeCheck(child(a, 0), "expression");
         
         if (child(a, 0)->tp->kind != "error" && child(a, 0)->tp->kind != "bool")
             errorbooleanrequired(a->line, a->kind);
@@ -326,7 +326,7 @@ void TypeCheck(AST *a,string info)
     /* KIND WHILE */
     else if (a->kind == "while")
     {
-        TypeCheck(child(a, 0));
+        TypeCheck(child(a, 0), "expression");
         
         if (child(a, 0)->tp->kind != "error" && child(a, 0)->tp->kind != "bool")
             errorbooleanrequired(a->line, a->kind);
@@ -371,8 +371,8 @@ void TypeCheck(AST *a,string info)
     /* KIND AND or OR */
     else if (a->kind == "and" || a->kind == "or")
     {
-        TypeCheck(child(a, 0));
-        TypeCheck(child(a, 1));
+        TypeCheck(child(a, 0), "expression");
+        TypeCheck(child(a, 1), "expression");
         
         if ((child(a, 0)->tp->kind != "error" && child(a, 0)->tp->kind != "bool") || (child(a, 1)->tp->kind != "error" && child(a, 1)->tp->kind != "bool"))
             errorincompatibleoperator(a->line, a->kind);
@@ -383,8 +383,8 @@ void TypeCheck(AST *a,string info)
     /* KIND EQUAL */
     else if (a->kind == "=")
     {
-        TypeCheck(child(a, 0));
-        TypeCheck(child(a, 1));
+        TypeCheck(child(a, 0), "expression");
+        TypeCheck(child(a, 1), "expression");
         
         if (child(a, 0)->tp->kind != "error" && child(a, 1)->tp->kind != "error" && (!isbasickind(child(a, 0)->tp->kind) || !equivalent_types(child(a, 0)->tp, child(a, 1)->tp)))
             errorincompatibleoperator(a->line, a->kind );
@@ -395,8 +395,8 @@ void TypeCheck(AST *a,string info)
     /* KIND GTHAN or LTHAN */
     else if (a->kind == ">" || a->kind == "<")
     {
-        TypeCheck(child(a, 0));
-        TypeCheck(child(a, 1));
+        TypeCheck(child(a, 0), "expression");
+        TypeCheck(child(a, 1), "expression");
         
         if (child(a, 0)->tp->kind != "error" && child(a, 1)->tp->kind != "error" && (child(a, 0)->tp->kind != "int" || !equivalent_types(child(a, 0)->tp, child(a, 1)->tp)))
             errorincompatibleoperator(a->line, a->kind );
@@ -407,8 +407,8 @@ void TypeCheck(AST *a,string info)
     /* KIND PLUS, MINUS, TIMES or DIV */
     else if (a->kind == "+" || (a->kind == "-" && child(a, 1) != 0) || a->kind=="*" || a->kind=="/")
     {
-        TypeCheck(child(a, 0));
-        TypeCheck(child(a, 1));
+        TypeCheck(child(a, 0), "expression");
+        TypeCheck(child(a, 1), "expression");
         
         if ((child(a, 0)->tp->kind != "error" && child(a, 0)->tp->kind != "int") || (child(a, 1)->tp->kind != "error" && child(a, 1)->tp->kind != "int"))
             errorincompatibleoperator(a->line, a->kind);
@@ -419,7 +419,7 @@ void TypeCheck(AST *a,string info)
     /* KIND MINUS (UNARY) */
     else if (a->kind == "-" && child(a, 1) == 0)
     {
-        TypeCheck(child(a, 0));
+        TypeCheck(child(a, 0), "expression");
         
         if (child(a, 0)->tp->kind != "error" && child(a, 0)->tp->kind != "int")
             errorincompatibleoperator(a->line, a->kind);
@@ -430,7 +430,7 @@ void TypeCheck(AST *a,string info)
     /* KIND NOT */
     else if (a->kind == "not")
     {
-      TypeCheck(child(a, 0));
+      TypeCheck(child(a, 0), "expression");
       
       if (child(a, 0)->tp->kind != "error" && child(a, 0)->tp->kind != "bool")
           errorincompatibleoperator(a->line, a->kind);
@@ -442,8 +442,8 @@ void TypeCheck(AST *a,string info)
     else if (a->kind == "(")
     {
         TypeCheck(child(a, 0));
-        
-        if (child(a, 0)->tp->kind != "error")
+	
+	if (child(a, 0)->tp->kind != "error")
         {
             if (child(a, 0)->tp->kind == "procedure" || child(a, 0)->tp->kind == "function")
             {
@@ -452,7 +452,7 @@ void TypeCheck(AST *a,string info)
                     if (child(a, 0)->tp->kind != "procedure")
                         errorisnotprocedure(a->line);
                 }
-                else
+                else if (info == "expression")
                 {
                     if (child(a, 0)->tp->kind != "function")
                         errorisnotfunction(a->line);
@@ -462,15 +462,16 @@ void TypeCheck(AST *a,string info)
             }
             else if (info == "instruction")
                 errorisnotprocedure(a->line);
-            else errorisnotfunction(a->line);
+            else if (info == "expression")
+		errorisnotfunction(a->line);
         }
     }
 
     /* KIND OPENCLASP */
     else if (a->kind == "[")
     {
-        TypeCheck(child(a, 0));
-        TypeCheck(child(a, 1));
+        TypeCheck(child(a, 0), "expression");
+        TypeCheck(child(a, 1), "expression");
         
         a->ref = child(a, 0)->ref;
         
@@ -489,7 +490,7 @@ void TypeCheck(AST *a,string info)
     else if (a->kind == ":=")
     {
         TypeCheck(child(a, 0));
-        TypeCheck(child(a, 1));
+        TypeCheck(child(a, 1), "expression");
         
         if (!child(a, 0)->ref || child(a, 0)->tp->kind == "procedure" || child(a, 0)->tp->kind == "function")
             errornonreferenceableleft(a->line, child(a, 0)->text);
@@ -501,7 +502,7 @@ void TypeCheck(AST *a,string info)
     /* KIND STRUCT DOT */
     else if (a->kind==".")
     {
-        TypeCheck(child(a, 0));
+        TypeCheck(child(a, 0), "expression");
         a->ref = child(a, 0)->ref;
         
         if (child(a, 0)->tp->kind != "error")
