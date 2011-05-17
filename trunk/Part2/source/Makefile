@@ -23,7 +23,7 @@ scan.o err.o: %.o: %.c
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
 clean:
-	@$(RM) cl cl.o codegen.o codegest.o err.o ptype.o scan.o semantic.o \
+	@$(RM) core* cl cl.o codegen.o codegest.o err.o ptype.o scan.o semantic.o \
 		symtab.o util.o cl.c err.c mode.h parser.dlg scan.c tokens.h
 
 jps := $(sort $(wildcard jp?)) $(sort $(wildcard jp??))
@@ -42,12 +42,12 @@ test_all:
 	@cp ../sjps/* .
 	
 test_clean:
-	@$(RM) jp* sjp*
+	@$(RM) output jp* sjp*
 
 diff: cl
 	@for i in $(jps); do \
 		echo $$i; \
-		./cl execute < $$i > sortida; \
-		diff s$$i sortida; \
+		./cl execute < $$i > output; \
+		diff s$$i output; \
 	done
-	@$(RM) sortida jp* sjp*
+	@$(RM) output jp* sjp*
