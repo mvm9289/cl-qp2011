@@ -121,7 +121,20 @@ void CodeGenRealParams(AST *a,ptype tp,codechain &cpushparam,codechain &cremovep
   for (AST *a1=a; a1!=0; a1=a1->right)
   {
     if (tp->kind == "parval")
-      cpushparam=cpushparam||GenRight(a1, t);
+    {
+      if (isbasickind(tp->down->kind))
+        cpushparam=cpushparam||GenRight(a1, t);
+      else if (tp->down->kind=="array")
+      {
+        cpushparam=cpushparam||
+          GenLeft(a1,t+1)||
+          "aload aux_space t"+itostring(t)||
+          "addi t"+itostring(t)+" "+itostring(offsetauxspace)+" t"+itostring(t)||
+          "copy t"+itostring(t+1)+" t"+itostring(t)+" "+itostring(tp->down->size*tp->down->numelemsarray);
+        offsetauxspace+=tp->down->size*tp->down->numelemsarray;
+        if (offsetauxspace > maxoffsetauxspace) maxoffsetauxspace = offsetauxspace;
+      }
+    }
     else // tp-kind == "parref"
       cpushparam=cpushparam||GenLeft(a1, t);
     cpushparam=cpushparam||"pushparam t"+itostring(t);
@@ -212,7 +225,7 @@ codechain GenRight(AST *a,int t)
     }
     else
     {
-      //...to be done
+      // To be done.
     }    
   } 
   else if (a->kind=="intconst")
@@ -292,15 +305,30 @@ codechain GenRight(AST *a,int t)
   }
   else if (a->kind == "(")
   {
-    codechain cpushparam = "pushparam 0";
+    codechain cpushparam;
+    if (isbasickind(child(a,0)->tp->right->kind))
+      cpushparam = "pushparam 0";
+    else if (child(a,0)->tp->right->kind=="array")
+    {
+      cpushparam = "aload aux_space t"+itostring(t)||
+        "addi t"+itostring(t)+" "+itostring(offsetauxspace)+" t"+itostring(t)||
+        "pushparam t"+itostring(t);
+      offsetauxspace+=child(a,0)->tp->down->down->size*child(a,0)->tp->down->down->numelemsarray;
+      if (offsetauxspace > maxoffsetauxspace) maxoffsetauxspace = offsetauxspace;
+      t++;
+    }
     codechain cremoveparam;
     CodeGenRealParams(child(child(a, 1), 0), child(a, 0)->tp->down, cpushparam, cremoveparam, t);
     cpushparam=cpushparam||
     indirections(symboltable.jumped_scopes(child(a,0)->text),t)||
     "pushparam t"+itostring(t);
-    cremoveparam=cremoveparam||
-      "killparam"||
-      "popparam t"+itostring(t);
+    cremoveparam=cremoveparam||"killparam";
+    if (isbasickind(child(a,0)->tp->right->kind))
+      cremoveparam=cremoveparam||"popparam t"+itostring(t);
+    else
+    {
+      cremoveparam=cremoveparam||"killparam";
+    }
     c=cpushparam||
       "call "+symboltable.idtable(child(a,0)->text)+"_"+child(a,0)->text||
       cremoveparam;
@@ -398,8 +426,7 @@ codechain CodeGenInstruction(AST *a,string info="")
     c=c||"etiq endif_"+itostring(etiq);
   }
   else if (a->kind == "(")
-  {                                                                                                            
-
+  {
     codechain cpushparam, cremoveparam;
     CodeGenRealParams(child(child(a, 1), 0), child(a, 0)->tp->down, cpushparam, cremoveparam, 0);
     cpushparam=cpushparam||
@@ -409,9 +436,6 @@ codechain CodeGenInstruction(AST *a,string info="")
     c=cpushparam||
       "call "+symboltable.idtable(child(a,0)->text)+"_"+child(a,0)->text||
       cremoveparam;
-    cout << "AAAAAAAAAA " << symboltable[child(a,0)->text].tp->down->down->kind << endl;
-    if (!isbasickind(symboltable[child(a,0)->text].tp->down->down->kind))
-      maxoffsetauxspace+=symboltable[child(a,0)->text].tp->down->down->size;
   }
   
   #ifdef __DEBUG__
@@ -439,15 +463,30 @@ void CodeGenSubroutine(AST *a,list<codesubroutine> &l)
   {
     CodeGenSubroutine(a1,l);
   }
-  maxoffsetauxspace=0;newLabelIf(true); newLabelWhile(true);
+  
+  maxoffsetauxspace=0;
+  newLabelIf(true);
+  newLabelWhile(true);
+  
   cs.c=CodeGenInstruction(child(a,3));
   if (a->sc,cs,a->kind=="function")
-    cs.c=cs.c||
-      "load _"+child(a,4)->text+" t0"||
-      "stor t0 returnvalue";
+  {
+    if (isbasickind(a->tp->right->kind))
+      cs.c=cs.c||
+        "load _"+child(a,4)->text+" t0"||
+        "stor t0 returnvalue";
+    else if (a->tp->right->kind=="array")
+    {
+      cs.c=cs.c||
+        "aload _"+child(a,4)->text+" t1"||
+        "load returnvalue t0"||
+        "copy t1 t0 "+itostring(a->tp->down->down->size);
+    }
+  }
   cs.c=cs.c||"retu";
   
-  if (maxoffsetauxspace>0) {
+  if (maxoffsetauxspace>0)
+  {
     variable_data vd;
     vd.name="aux_space";
     vd.size=maxoffsetauxspace;
